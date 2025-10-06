@@ -4,10 +4,14 @@
 # File Name             : main.py                 #
 # ----------------------------------------------- #
 
+from dotenv import load_dotenv
 from handler import send_alert
 import config
 import time
 from flask import Flask, request, jsonify
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
