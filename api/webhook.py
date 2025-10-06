@@ -1,17 +1,19 @@
 # ----------------------------------------------- #
 # Plugin Name           : TradingView-Webhook-Bot #
 # Author Name           : fabston                 #
-# File Name             : main.py                 #
+# File Name             : api/webhook.py          #
 # ----------------------------------------------- #
 
-from dotenv import load_dotenv
+import sys
+import os
+
+# Add parent directory to path so we can import handler and config
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from handler import send_alert
 import config
 import time
 from flask import Flask, request, jsonify
-
-# Load environment variables from .env file (for local development)
-load_dotenv()
 
 app = Flask(__name__)
 
@@ -41,7 +43,6 @@ def webhook():
                 print(get_timestamp(), "Alert Received & Sent!")
                 send_alert(data)
                 return jsonify({'message': 'Webhook received successfully'}), 200
-
             else:
                 print("[X]", get_timestamp(), "Alert Received & Refused! (Wrong Key)")
                 return jsonify({'message': 'Unauthorized'}), 401
@@ -51,9 +52,7 @@ def webhook():
         return jsonify({'message': 'Error'}), 400
 
 
-# For local development only
-if __name__ == "__main__":
-    from waitress import serve
-    print("Starting local development server on http://0.0.0.0:8080")
-    print("Webhook endpoint: http://0.0.0.0:8080/webhook")
-    serve(app, host="0.0.0.0", port=8080)
+# Vercel serverless function handler
+def handler(request):
+    with app.request_context(request.environ):
+        return app.full_dispatch_request()
