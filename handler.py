@@ -27,24 +27,83 @@ except ImportError:
 import config
 
 
+def format_telegram_message(data):
+    """Format message for TradingView trading signals"""
+    import re
+    from datetime import datetime
+
+    # Get the original message
+    original_msg = data["msg"].encode("latin-1", "backslashreplace").decode("unicode_escape")
+
+    # Try to parse trading information from the message
+    # Pattern: "SYMBOL has moved DIRECTION by PERCENTAGE in TIMEFRAME"
+    pattern = r"(\w+)\s+has\s+moved\s+(upward|downward)\s+by\s+([\d.]+%)\s+in\s+(\w+)"
+    match = re.search(pattern, original_msg, re.IGNORECASE)
+
+    if match:
+        symbol = match.group(1)
+        direction = match.group(2)
+        percentage = match.group(3)
+        timeframe = match.group(4)
+
+        # Determine emoji and action based on direction
+        if direction.lower() == "upward":
+            emoji = "🟢"
+            action = "📈 BULLISH SIGNAL"
+            arrow = "⬆️"
+        else:
+            emoji = "🔴"
+            action = "📉 BEARISH SIGNAL"
+            arrow = "⬇️"
+
+        # Format professional trading message
+        formatted_msg = f"""🚨 *TRADINGVIEW ALERT* 🚨
+
+{emoji} *{symbol}* {arrow}
+
+{action}
+━━━━━━━━━━━━━━━━━━━━
+📊 *Move:* {percentage} {direction}
+⏰ *Timeframe:* {timeframe}
+🕒 *Time:* {datetime.now().strftime('%H:%M:%S UTC')}
+━━━━━━━━━━━━━━━━━━━━
+
+💡 _Automated signal from TradingView_"""
+    else:
+        # Fallback to enhanced formatting for non-standard messages
+        timestamp = datetime.now().strftime('%H:%M:%S UTC')
+        formatted_msg = f"""🚨 *TRADINGVIEW ALERT* 🚨
+
+📢 {original_msg}
+
+🕒 *Time:* {timestamp}
+━━━━━━━━━━━━━━━━━━━━
+💡 _Automated signal from TradingView_"""
+
+    return formatted_msg
+
 def send_alert(data):
-    msg = data["msg"].encode("latin-1", "backslashreplace").decode("unicode_escape")
+    # Use formatted message for Telegram, original for others
+    original_msg = data["msg"].encode("latin-1", "backslashreplace").decode("unicode_escape")
     if config.send_telegram_alerts:
         try:
             chat_id = data.get("telegram", config.channel)
             telegram_url = f"https://api.telegram.org/bot{config.tg_token}/sendMessage"
+            # Use formatted message for Telegram
+            formatted_msg = format_telegram_message(data)
             payload = {
                 "chat_id": chat_id,
-                "text": msg,
+                "text": formatted_msg,
                 "parse_mode": "MARKDOWN"
             }
             response = requests.post(telegram_url, json=payload)
             response.raise_for_status()
         except KeyError:
             telegram_url = f"https://api.telegram.org/bot{config.tg_token}/sendMessage"
+            formatted_msg = format_telegram_message(data)
             payload = {
                 "chat_id": config.channel,
-                "text": msg,
+                "text": formatted_msg,
                 "parse_mode": "MARKDOWN"
             }
             response = requests.post(telegram_url, json=payload)
@@ -60,14 +119,14 @@ def send_alert(data):
             webhook = DiscordWebhook(
                 url="https://discord.com/api/webhooks/" + data["discord"]
             )
-            embed = DiscordEmbed(title=msg)
+            embed = DiscordEmbed(title=original_msg)
             webhook.add_embed(embed)
             webhook.execute()
         except KeyError:
             webhook = DiscordWebhook(
                 url="https://discord.com/api/webhooks/" + config.discord_webhook
             )
-            embed = DiscordEmbed(title=msg)
+            embed = DiscordEmbed(title=original_msg)
             webhook.add_embed(embed)
             webhook.execute()
         except Exception as e:
@@ -79,12 +138,12 @@ def send_alert(data):
             return
         try:
             slack = Slack(url="https://hooks.slack.com/services/" + data["slack"])
-            slack.post(text=msg)
+            slack.post(text=original_msg)
         except KeyError:
             slack = Slack(
                 url="https://hooks.slack.com/services/" + config.slack_webhook
             )
-            slack.post(text=msg)
+            slack.post(text=original_msg)
         except Exception as e:
             print("[X] Slack Error:\n>", e)
 
@@ -97,7 +156,7 @@ def send_alert(data):
         tw_api = tweepy.API(tw_auth)
         try:
             tw_api.update_status(
-                status=msg.replace("*", "").replace("_", "").replace("`", "")
+                status=original_msg.replace("*", "").replace("_", "").replace("`", "")
             )
         except Exception as e:
             print("[X] Twitter Error:\n>", e)
@@ -105,7 +164,7 @@ def send_alert(data):
     if config.send_email_alerts:
         try:
             email_msg = MIMEText(
-                msg.replace("*", "").replace("_", "").replace("`", "")
+                original_msg.replace("*", "").replace("_", "").replace("`", "")
             )
             email_msg["Subject"] = config.email_subject
             email_msg["From"] = config.email_sender
