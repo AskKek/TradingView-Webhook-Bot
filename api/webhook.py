@@ -52,7 +52,5 @@ def webhook():
         return jsonify({'message': 'Error'}), 400
 
 
-# Vercel serverless function handler
-def handler(request):
-    with app.request_context(request.environ):
-        return app.full_dispatch_request()
+# Export app for Vercel - no custom handler needed
+# Vercel will automatically detect and use the Flask app instance

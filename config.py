@@ -5,6 +5,11 @@
 # ----------------------------------------------- #
 
 import os
+from dotenv import load_dotenv
+
+# Load .env file for local development only
+# Vercel will use environment variables from dashboard
+load_dotenv()
 
 # TradingView Example Alert Message:
 # {
